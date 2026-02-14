@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Docker Compose
+name: Deploy Flask App to EC2
 
 on:
   push:
@@ -10,24 +10,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install SSH key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        known_hosts: ${{ secrets.KNOWN_HOSTS }}
-    - name: Remove .git directory temporarily
-      run: |
-        rm -r .git
-    - name: Copy files to EC2
-   
-      run: |
-        scp -o StrictHostKeyChecking=no -r . ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/hmap-sri
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
 
-    - name: Deploy with Docker Compose
-      run: |
-        ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} "
-          echo "Updating system packages..."
-          sudo yum update -y  # For Amazon Linux
+      - name: Copy project to EC2 (SCP)
+        run: |
+          scp -i ~/.ssh/id_rsa -r ./ $EC2_USER@$EC2_HOST:/home/ubuntu/${{ github.repository }}
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+
+      - name: Install dependencies and run app
+        run: |
+          ssh $EC2_USER@$EC2_HOST << EOF
+          cd /home/ubuntu/${{ github.repository }}
+          python3 -m venv venv
+          venv/bin/pip install -r requirements.txt
+          nohup venv/bin/python run.py > app.log 2>&1 &
+          EOF
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
