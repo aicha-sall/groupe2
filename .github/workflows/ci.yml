@@ -1,4 +1,4 @@
-name: Deploy Flask App to EC2
+name: Deploy Flask App to Ubuntu Server
 
 on:
   push:
@@ -21,23 +21,23 @@ jobs:
           ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_HOST: 18.191.205.102
 
       - name: Copy project to EC2 (SCP)
         run: |
-          scp -i ~/.ssh/id_rsa -r ./ $EC2_USER@$EC2_HOST:/home/$aicha-sall/groupe2
+          scp -i ~/.ssh/id_rsa -r ./ $EC2_USER@$EC2_HOST:/home/$EC2_USER/groupe2
         env:
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ubuntu
+          EC2_HOST: 18.191.205.102
 
       - name: Install dependencies and run app
         run: |
           ssh $EC2_USER@$EC2_HOST << EOF
-          cd /home/aicha-sall/groupe2
+          cd /home/$EC2_USER/groupe2
           python3 -m venv venv
           venv/bin/pip install -r requirements.txt
-          nohup venv/bin/python run.py > app.log 2>&1 &
+          nohup venv/bin/python app.py > app.log 2>&1 &
           EOF
         env:
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ubuntu
+          EC2_HOST: 18.191.205.102
